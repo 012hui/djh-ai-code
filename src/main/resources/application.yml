@@ -1,6 +1,13 @@
 spring:
   application:
     name: djh-ai-code
+  # mysql
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/djh_ai_code
+    username: root
+    password: mysql
+
 server:
   port: 8123
   servlet:
