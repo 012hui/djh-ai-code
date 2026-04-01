@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import org.test.djhaicode.ai.AiCodeGeneratorService;
 import org.test.djhaicode.ai.model.HtmlCodeResult;
 import org.test.djhaicode.ai.model.MultiFileCodeResult;
+import org.test.djhaicode.core.parser.CodeParserExecutor;
+import org.test.djhaicode.core.saver.CodeFileSaverExecutor;
 import org.test.djhaicode.exception.BusinessException;
 import org.test.djhaicode.exception.ErrorCode;
 import org.test.djhaicode.model.enums.CodeGenTypeEnum;
@@ -35,8 +37,14 @@ public class AiCodeGeneratorFacade {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成类型为空");
         }
         return switch (codeGenTypeEnum) {
-            case HTML -> generateAndSaveHtmlCode(userMessage);
-            case MULTI_FILE -> generateAndSaveMultiFileCode(userMessage);
+            case HTML -> {
+                HtmlCodeResult result = aiCodeGeneratorService.generateHtmlCode(userMessage);
+                yield CodeFileSaverExecutor.executeSaver(result, CodeGenTypeEnum.HTML);
+            }
+            case MULTI_FILE -> {
+                MultiFileCodeResult result = aiCodeGeneratorService.generateMultiFileCode(userMessage);
+                yield CodeFileSaverExecutor.executeSaver(result, CodeGenTypeEnum.MULTI_FILE);
+            }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, errorMessage);
@@ -49,15 +57,20 @@ public class AiCodeGeneratorFacade {
      *
      * @param userMessage     用户提示词
      * @param codeGenTypeEnum 生成类型
-     * @return 保存的目录
      */
     public Flux<String> generateAndSaveCodeStream(String userMessage, CodeGenTypeEnum codeGenTypeEnum) {
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成类型为空");
         }
         return switch (codeGenTypeEnum) {
-            case HTML -> generateAndSaveHtmlCodeStream(userMessage);
-            case MULTI_FILE -> generateAndSaveMultiFileCodeStream(userMessage);
+            case HTML -> {
+                Flux<String> codeStream = aiCodeGeneratorService.generateHtmlCodeStream(userMessage);
+                yield processCodeStream(codeStream, CodeGenTypeEnum.HTML);
+            }
+            case MULTI_FILE -> {
+                Flux<String> codeStream = aiCodeGeneratorService.generateMultiFileCodeStream(userMessage);
+                yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE);
+            }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, errorMessage);
@@ -66,11 +79,42 @@ public class AiCodeGeneratorFacade {
     }
 
     /**
+     * 通用流式代码处理方法
+     *
+     * @param codeStream  代码流
+     * @param codeGenType 代码生成类型
+     * @return 流式响应
+     */
+    private Flux<String> processCodeStream(Flux<String> codeStream, CodeGenTypeEnum codeGenType) {
+        StringBuilder codeBuilder = new StringBuilder();
+        //doOnNext方法的作用：注册一个回调，在每个元素（代码片段）从流中发出时执行
+        //参数：chunk是每个代码片段（字符串）
+        return codeStream.doOnNext(chunk -> {
+            // 实时收集代码片段,将每个代码片段追加到 codeBuilder中
+            codeBuilder.append(chunk);
+        }).doOnComplete(() -> {//doOnComplete方法：注册一个回调，在流正常完成时执行
+            // 流式返回完成后保存代码
+            try {
+                String completeCode = codeBuilder.toString();
+                // 使用执行器解析代码
+                Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
+                // 使用执行器保存代码
+                File savedDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType);
+                log.info("保存成功，路径为：" + savedDir.getAbsolutePath());
+            } catch (Exception e) {
+                log.error("保存失败: {}", e.getMessage());
+            }
+        });
+    }
+
+
+    /**
      * 生成 HTML 模式的代码并保存（流式）
      *
      * @param userMessage 用户提示词
      * @return 保存的目录
      */
+    @Deprecated
     private Flux<String> generateAndSaveHtmlCodeStream(String userMessage) {
         //Flux表示一个0-N个元素的异步序列，这里每个元素是代码的字符串片段
         Flux<String> result = aiCodeGeneratorService.generateHtmlCodeStream(userMessage);
@@ -102,6 +146,7 @@ public class AiCodeGeneratorFacade {
      * @param userMessage 用户提示词
      * @return 保存的目录
      */
+    @Deprecated
     private Flux<String> generateAndSaveMultiFileCodeStream(String userMessage) {
         Flux<String> result = aiCodeGeneratorService.generateMultiFileCodeStream(userMessage);
         //字符串拼接器，用于当流式返回所有的代码之后，再保存代码
@@ -131,6 +176,7 @@ public class AiCodeGeneratorFacade {
      * @param userMessage 用户提示词
      * @return 保存的目录
      */
+    @Deprecated
     private File generateAndSaveHtmlCode(String userMessage) {
         HtmlCodeResult result = aiCodeGeneratorService.generateHtmlCode(userMessage);
         return CodeFileSaver.saveHtmlCodeResult(result);
@@ -142,6 +188,7 @@ public class AiCodeGeneratorFacade {
      * @param userMessage 用户提示词
      * @return 保存的目录
      */
+    @Deprecated
     private File generateAndSaveMultiFileCode(String userMessage) {
         MultiFileCodeResult result = aiCodeGeneratorService.generateMultiFileCode(userMessage);
         return CodeFileSaver.saveMultiFileCodeResult(result);
