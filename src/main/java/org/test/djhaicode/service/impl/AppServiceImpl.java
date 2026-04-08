@@ -8,6 +8,9 @@ import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.servlet.View;
 import org.test.djhaicode.constant.AppConstant;
 import org.test.djhaicode.core.AiCodeGeneratorFacade;
 import org.test.djhaicode.exception.BusinessException;
@@ -17,15 +20,18 @@ import org.test.djhaicode.model.dto.app.AppQueryRequest;
 import org.test.djhaicode.model.entity.App;
 import org.test.djhaicode.mapper.AppMapper;
 import org.test.djhaicode.model.entity.User;
+import org.test.djhaicode.model.enums.ChatHistoryMessageTypeEnum;
 import org.test.djhaicode.model.enums.CodeGenTypeEnum;
 import org.test.djhaicode.model.vo.AppVO;
 import org.test.djhaicode.model.vo.UserVO;
 import org.test.djhaicode.service.AppService;
 import org.springframework.stereotype.Service;
+import org.test.djhaicode.service.ChatHistoryService;
 import org.test.djhaicode.service.UserService;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -35,11 +41,15 @@ import java.util.stream.Collectors;
  *
  * @author <a href="https://github.com/012hui">djh</a>
  */
+@Slf4j
 @Service
 public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppService{
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private ChatHistoryService chatHistoryService;
 
     @Resource
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
@@ -106,8 +116,31 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         if(codeGenTypeEnum == null){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR,"不支持的代码生成类型");
         }
-        //5.调用AI生成代码
-        return aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
+        //5.通过校验后，添加用户消息到对话历史
+        chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
+        //6.调用AI生成代码（流式）
+        Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
+        //7.收集AI响应内容，在完成后记录到对话历史
+        StringBuilder aiResponseBuilder = new StringBuilder();
+        return contentFlux
+                .map(chunk -> {
+                    // 收集AI响应内容
+                    aiResponseBuilder.append(chunk);
+                    return chunk;
+
+                }).
+                doOnComplete(() -> {//doOnComplete方法：注册一个回调，在流正常完成时执行
+                    // 流式返回完成后,保存AI消息到对话历史
+                    String aiResponse = aiResponseBuilder.toString();
+                    if (StrUtil.isNotBlank(aiResponse)) {
+                        chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
+                    }
+                })
+                .doOnError(error -> {
+                    //如果AI回复失败，也要记录信息
+                    String errorMessage = "AI回复失败：" + error.getMessage();
+                    chatHistoryService.addChatMessage(appId, errorMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
+                });
     }
 
     @Override
@@ -173,4 +206,31 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         }).collect(Collectors.toList());
     }
 
+    /**
+     * 删除应用时关联删除对话历史
+     * 即使对话历史删除失败，也不阻止应用删除，只是记录错误日志
+     *
+     * @param id   应用ID
+     * @return  是否成功
+     */
+    @Override
+    public boolean removeById(Serializable id){
+        if(id == null){
+            return false;
+        }
+        //转换类型 Long
+        Long appId = Long.valueOf(id.toString());
+        if(appId <= 0){
+            return false;
+        }
+        //先删除关联的对话历史
+        try {
+            chatHistoryService.deleteByAppId(appId);
+        } catch (Exception e) {
+            //记录日志但不阻止应用删除
+            log.error("删除应用关联对话历史失败: {}", e.getMessage());
+        }
+        //删除应用
+        return super.removeById(id);
+    }
 }
