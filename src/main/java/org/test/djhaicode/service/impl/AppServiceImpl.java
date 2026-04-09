@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.servlet.View;
 import org.test.djhaicode.constant.AppConstant;
 import org.test.djhaicode.core.AiCodeGeneratorFacade;
+import org.test.djhaicode.core.handler.StreamHandlerExecutor;
 import org.test.djhaicode.exception.BusinessException;
 import org.test.djhaicode.exception.ErrorCode;
 import org.test.djhaicode.exception.ThrowUtils;
@@ -53,6 +54,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
 
     @Resource
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
+    @Autowired
+    private StreamHandlerExecutor streamHandlerExecutor;
 
     @Override
     public String deployApp(Long appId, User loginUser) {
@@ -119,28 +122,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         //5.通过校验后，添加用户消息到对话历史
         chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
         //6.调用AI生成代码（流式）
-        Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
+        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
         //7.收集AI响应内容，在完成后记录到对话历史
-        StringBuilder aiResponseBuilder = new StringBuilder();
-        return contentFlux
-                .map(chunk -> {
-                    // 收集AI响应内容
-                    aiResponseBuilder.append(chunk);
-                    return chunk;
-
-                }).
-                doOnComplete(() -> {//doOnComplete方法：注册一个回调，在流正常完成时执行
-                    // 流式返回完成后,保存AI消息到对话历史
-                    String aiResponse = aiResponseBuilder.toString();
-                    if (StrUtil.isNotBlank(aiResponse)) {
-                        chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-                    }
-                })
-                .doOnError(error -> {
-                    //如果AI回复失败，也要记录信息
-                    String errorMessage = "AI回复失败：" + error.getMessage();
-                    chatHistoryService.addChatMessage(appId, errorMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-                });
+        return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser,codeGenTypeEnum);
     }
 
     @Override
