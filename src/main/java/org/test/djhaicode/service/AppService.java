@@ -30,6 +30,14 @@ public interface AppService extends IService<App> {
     String deployApp(Long appId, User loginUser);
 
     /**
+     * 异步生成应用截图并更新封面
+     *
+     * @param appId     应用ID
+     * @param appUrl    应用访问URL
+     */
+    void generateAppScreenshotAsync(Long appId, String appUrl);
+
+    /**
      * 通过对话生成应用代码（SSE）
      * 调用generateAndSaveCodeStream生成代码，并且流式返回前端。
      * 前端不需要区分用户是否是第一次和该应用对话，始终调用这个接口即可，需要怎么做都交给后端来判断。
