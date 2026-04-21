@@ -2,6 +2,7 @@ package org.test.djhaicode.service;
 
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
+import org.test.djhaicode.model.dto.app.AppAddRequest;
 import org.test.djhaicode.model.dto.app.AppQueryRequest;
 import org.test.djhaicode.model.entity.App;
 import org.test.djhaicode.model.entity.User;
@@ -36,6 +37,15 @@ public interface AppService extends IService<App> {
      * @param appUrl    应用访问URL
      */
     void generateAppScreenshotAsync(Long appId, String appUrl);
+
+    /**
+     * 生成应用
+     *
+     * @param appAddRequest
+     * @param loginUser
+     * @return
+     */
+    Long createApp(AppAddRequest appAddRequest, User loginUser);
 
     /**
      * 通过对话生成应用代码（SSE）
