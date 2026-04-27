@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.bsc.langgraph4j.prebuilt.MessagesState;
+import org.test.djhaicode.langgraph4j.model.ImageCollectionPlan;
 import org.test.djhaicode.langgraph4j.model.ImageResource;
 import org.test.djhaicode.langgraph4j.model.QualityResult;
 import org.test.djhaicode.model.enums.CodeGenTypeEnum;
@@ -52,6 +53,19 @@ public class WorkflowContext implements Serializable {
      * 增强后的提示词
      */
     private String enhancedPrompt;
+    /**
+     * 图片收集计划
+     */
+    private ImageCollectionPlan imageCollectionPlan;
+
+
+    /**
+     * 并发图片收集的中间结果字段
+     */
+    private List<ImageResource> contentImages;
+    private List<ImageResource> illustrations;
+    private List<ImageResource> diagrams;
+    private List<ImageResource> logos;
 
     /**
      * 代码生成类型
