@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.bsc.langgraph4j.prebuilt.MessagesState;
 import org.test.djhaicode.langgraph4j.model.ImageResource;
+import org.test.djhaicode.langgraph4j.model.QualityResult;
 import org.test.djhaicode.model.enums.CodeGenTypeEnum;
 
 import java.io.Serial;
@@ -66,6 +67,11 @@ public class WorkflowContext implements Serializable {
      * 构建成功的目录
      */
     private String buildResultDir;
+
+    /**
+     * 质量检查结果
+     */
+    private QualityResult qualityResult;
 
     /**
      * 错误信息
