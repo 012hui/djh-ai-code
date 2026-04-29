@@ -12,6 +12,8 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.test.djhaicode.ai.guardrail.PromptSafetyInputGuardrail;
+import org.test.djhaicode.ai.guardrail.RetryOutputGuardrail;
 import org.test.djhaicode.ai.tools.*;
 import org.test.djhaicode.exception.BusinessException;
 import org.test.djhaicode.exception.ErrorCode;
@@ -101,6 +103,8 @@ public class AiCodeGeneratorServiceFactory {
                         .tools(toolManager.getAllTools())
                         //处理工具调用幻觉问题
                         .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()))
+                        .inputGuardrails(new PromptSafetyInputGuardrail()) // 添加输入护轨
+//                      .outputGuardrails(new RetryOutputGuardrail()) // 添加输出护轨，为了流式输出，这里不使用
                         .build();
             }
             //HTML,多文件生成使用默认模型
@@ -112,6 +116,8 @@ public class AiCodeGeneratorServiceFactory {
                         .chatModel(chatModel)
                         .streamingChatModel(openAiStreamingChatModel)
                         .chatMemory(chatMemory)
+                        .inputGuardrails(new PromptSafetyInputGuardrail()) // 添加输入护轨
+//                      .outputGuardrails(new RetryOutputGuardrail()) // 添加输出护轨，为了流式输出，这里不使用
                         .build();
             }
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型:" + codeGenType.getValue());
