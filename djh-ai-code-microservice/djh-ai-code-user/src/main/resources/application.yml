@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: djh-ai-code
+  # mysql
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/djh_ai_code
+    username: root
+    password: mysql
+  profiles:
+    active: local
+  # redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      ttl: 3600
+      database: 0
+  # session 配置
+  session:
+    store-type: redis
+    # session 30 天过期
+    timeout: 2592000
+
+server:
+  port: 8123
+  servlet:
+    context-path: /api
+    # cookie 30 天过期
+    session:
+      cookie:
+        max-age: 2592000
+# springdoc-openapi
+springdoc:
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: org.test.djhaicode.controller
+# knife4j
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
