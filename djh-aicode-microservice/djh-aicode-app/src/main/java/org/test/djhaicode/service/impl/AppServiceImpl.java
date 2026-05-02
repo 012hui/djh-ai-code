@@ -11,7 +11,7 @@ import djhaicode.innerservice.InnerScreenshotService;
 import djhaicode.innerservice.InnerUserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Lazy;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.test.djhaicode.ai.AiCodeGenTypeRoutingService;
 import org.test.djhaicode.ai.AiCodeGenTypeRoutingServiceFactory;
 import org.test.djhaicode.constant.AppConstant;
@@ -50,8 +50,7 @@ import java.util.stream.Collectors;
 @Service
 public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppService{
 
-    @Resource
-    @Lazy
+    @DubboReference
     private InnerUserService userService;
     @Resource
     private ChatHistoryService chatHistoryService;
@@ -61,8 +60,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
     private StreamHandlerExecutor streamHandlerExecutor;
     @Resource
     private VueProjectBuilder vueProjectBuilder;
-    @Resource
-    @Lazy
+    @DubboReference
     private InnerScreenshotService screenshotService;
     @Resource
     private AiCodeGenTypeRoutingServiceFactory aiCodeGenTypeRoutingServiceFactory;
