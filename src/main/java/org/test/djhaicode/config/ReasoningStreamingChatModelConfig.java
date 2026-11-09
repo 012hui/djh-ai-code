@@ -1,5 +1,6 @@
 package org.test.djhaicode.config;
 
+import dev.langchain4j.http.client.spring.restclient.SpringRestClient;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import jakarta.annotation.Resource;
@@ -44,6 +45,7 @@ public class ReasoningStreamingChatModelConfig {
                 .apiKey(apiKey)
                 .baseUrl(baseUrl)
                 .modelName(modelName)
+                .httpClientBuilder(SpringRestClient.builder())
                 .maxTokens(maxTokens)
                 .temperature(temperature)
                 .logRequests(logRequests)

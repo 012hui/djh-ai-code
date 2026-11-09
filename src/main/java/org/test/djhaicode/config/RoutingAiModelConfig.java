@@ -1,5 +1,7 @@
 package org.test.djhaicode.config;
 
+import dev.langchain4j.http.client.HttpClientBuilder;
+import dev.langchain4j.http.client.jdk.JdkHttpClient;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import lombok.Data;
@@ -31,6 +33,15 @@ public class RoutingAiModelConfig {
     private Boolean logResponses = false;
 
     /**
+     * 使用 JDK HTTP 客户端，避免 Spring RestClient + Apache HttpClient
+     * 读取 DeepSeek chunked 响应时只拿到首字节的问题
+     */
+    @Bean("openAiChatModelHttpClientBuilder")
+    public HttpClientBuilder openAiChatModelHttpClientBuilder() {
+        return JdkHttpClient.builder();
+    }
+
+    /**
      * 创建用于路由判断的ChatModel
      */
     @Bean
@@ -40,6 +51,7 @@ public class RoutingAiModelConfig {
                 .apiKey(apiKey)
                 .modelName(modelName)
                 .baseUrl(baseUrl)
+                .httpClientBuilder(JdkHttpClient.builder())
                 .maxTokens(maxTokens)
                 .temperature(temperature)
                 .logRequests(logRequests)
