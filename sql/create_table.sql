@@ -47,8 +47,11 @@ create table app
 create table chat_history
 (
     id          bigint auto_increment comment 'id' primary key,
+    -- AI 历史可能包含完整代码，使用 longtext 避免 TEXT 的 64KB 截断
     message     longtext                           not null comment '消息',
     messageType varchar(32)                        not null comment 'user/ai',
+    turnId      bigint                             null comment '轮次ID：同一轮用户消息和AI消息共享',
+    success     tinyint                            null comment '本轮是否成功完成：1成功 0失败；user行为null',
     appId       bigint                             not null comment '应用id',
     userId      bigint                             not null comment '创建用户id',
     createTime  datetime default CURRENT_TIMESTAMP not null comment '创建时间',
@@ -56,8 +59,25 @@ create table chat_history
     isDelete    tinyint  default 0                 not null comment '是否删除',
     INDEX idx_appId (appId),                       -- 提升基于应用的查询性能
     INDEX idx_createTime (createTime),             -- 提升基于时间的查询性能
-    INDEX idx_appId_createTime (appId, createTime) -- 游标查询核心索引
+    INDEX idx_appId_createTime (appId, createTime), -- 游标查询核心索引
+    INDEX idx_turnId (turnId),
+    INDEX idx_appId_turnId (appId, turnId)
 ) comment '对话历史' collate = utf8mb4_unicode_ci;
 
-ALTER TABLE chat_history
-    MODIFY COLUMN message LONGTEXT NOT NULL COMMENT '消息';
+-- 工具调用事件表
+-- 一行对应一次已执行完成的工具调用；summary 只存紧凑摘要，不存完整参数/结果
+create table chat_event
+(
+    id         bigint auto_increment comment 'id' primary key,
+    appId      bigint        not null comment '应用id',
+    turnId     bigint        not null comment '轮次ID，对应 chat_history.turnId',
+    seq        int           not null comment '轮内顺序，从1递增',
+    toolName   varchar(64)   not null comment '工具名',
+    summary    varchar(1024) not null comment '工具执行摘要',
+    success    tinyint       not null comment '工具是否成功：1成功 0失败',
+    createTime datetime default CURRENT_TIMESTAMP not null comment '创建时间',
+    isDelete   tinyint  default 0 not null comment '是否删除',
+    UNIQUE KEY uk_turn_seq (turnId, seq),
+    INDEX idx_appId_createTime (appId, createTime),
+    INDEX idx_turnId (turnId)
+) comment '工具调用事件' collate = utf8mb4_unicode_ci;
