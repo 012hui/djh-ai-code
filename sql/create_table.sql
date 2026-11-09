@@ -47,7 +47,7 @@ create table app
 create table chat_history
 (
     id          bigint auto_increment comment 'id' primary key,
-    message     text                               not null comment '消息',
+    message     longtext                           not null comment '消息',
     messageType varchar(32)                        not null comment 'user/ai',
     appId       bigint                             not null comment '应用id',
     userId      bigint                             not null comment '创建用户id',
@@ -59,3 +59,5 @@ create table chat_history
     INDEX idx_appId_createTime (appId, createTime) -- 游标查询核心索引
 ) comment '对话历史' collate = utf8mb4_unicode_ci;
 
+ALTER TABLE chat_history
+    MODIFY COLUMN message LONGTEXT NOT NULL COMMENT '消息';
