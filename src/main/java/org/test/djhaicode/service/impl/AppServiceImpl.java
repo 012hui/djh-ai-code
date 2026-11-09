@@ -176,6 +176,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         //1.参数校验
         ThrowUtils.throwIf(appId == null || appId <=0, ErrorCode.PARAMS_ERROR, "应用ID不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+        ThrowUtils.throwIf(message.length() > AppConstant.MAX_USER_MESSAGE_LENGTH,
+                ErrorCode.PARAMS_ERROR,
+                "输入内容过长，不要超过 " + AppConstant.MAX_USER_MESSAGE_LENGTH + " 字");
         //2.查询应用信息
         App app = this.getById(appId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
