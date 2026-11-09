@@ -3,7 +3,6 @@ package org.test.djhaicode.core.handler;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
-import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -11,16 +10,18 @@ import org.test.djhaicode.ai.model.message.*;
 import org.test.djhaicode.ai.tools.BaseTool;
 import org.test.djhaicode.ai.tools.ToolManager;
 import org.test.djhaicode.model.entity.User;
-import org.test.djhaicode.model.enums.ChatHistoryMessageTypeEnum;
 import org.test.djhaicode.service.ChatHistoryService;
 import reactor.core.publisher.Flux;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * JSON 消息流处理器
- * 处理 VUE_PROJECT 类型的复杂流式响应，包含工具调用信息
+ * 处理 VUE_PROJECT 类型的复杂流式响应，包含工具调用信息。
+ * 只负责解析流，流结束后的历史落库交给 StreamHistoryRecorder 统一处理。
  */
 @Slf4j
 @Component
@@ -37,30 +38,35 @@ public class JsonMessageStreamHandler {
      * @param chatHistoryService 聊天历史服务
      * @param appId              应用ID
      * @param loginUser          登录用户
+     * @param turnId             本轮轮次ID
      * @return 处理后的流
      */
     public Flux<String> handle(Flux<String> originFlux,
                                ChatHistoryService chatHistoryService,
-                               long appId, User loginUser) {
+                               long appId, User loginUser, long turnId) {
         // 收集数据用于生成后端记忆格式
         StringBuilder chatHistoryStringBuilder = new StringBuilder();
         // 用于跟踪已经见过的工具ID，判断是否是第一次调用
         Set<String> seenToolIds = new HashSet<>();
+        // doFinally 在完成/异常/取消时都会触发，用 AtomicBoolean 保证本轮 AI 行只落库一次
+        AtomicBoolean flushed = new AtomicBoolean(false);
+        // doFinally 拿不到异常对象，先用 doOnError 暂存，供 ON_ERROR 分支写失败原因
+        AtomicReference<Throwable> errorRef = new AtomicReference<>();
         return originFlux
                 .map(chunk -> {
                     // 解析每个 JSON 消息块
                     return handleJsonMessageChunk(chunk, chatHistoryStringBuilder, seenToolIds);
                 })
                 .filter(StrUtil::isNotEmpty) // 过滤空字串
-                .doOnComplete(() -> {
-                    // 流式响应完成后，添加 AI 消息到对话历史
-                    String aiResponse = chatHistoryStringBuilder.toString();
-                    chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-                })
-                .doOnError(error -> {
-                    // 如果AI回复失败，也要记录错误消息
-                    String errorMessage = "AI回复失败: " + error.getMessage();
-                    chatHistoryService.addChatMessage(appId, errorMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
+                .doOnError(errorRef::set)
+                .doFinally(signalType -> {
+                    // 完成/异常/取消都只落一次库；具体 success 和失败原因由 StreamHistoryRecorder 统一处理
+                    if (!flushed.compareAndSet(false, true)) {
+                        return;
+                    }
+                    StreamHistoryRecorder.recordTerminal(signalType, errorRef.get(),
+                            chatHistoryStringBuilder.toString(),
+                            chatHistoryService, appId, turnId, loginUser.getId());
                 });
     }
 

@@ -13,6 +13,12 @@ public interface AppConstant {
     Integer DEFAULT_APP_PRIORITY = 0;
 
     /**
+     * 用户单条消息最大长度。
+     * 保存用户消息前和 AI 输入护轨共用这个上限，避免两处规则不一致。
+     */
+    int MAX_USER_MESSAGE_LENGTH = 1000;
+
+    /**
      * 应用生成目录
      */
     String CODE_OUTPUT_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_output";

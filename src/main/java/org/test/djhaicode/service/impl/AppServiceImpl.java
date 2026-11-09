@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.util.IdUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
@@ -176,6 +177,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         //1.参数校验
         ThrowUtils.throwIf(appId == null || appId <=0, ErrorCode.PARAMS_ERROR, "应用ID不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+        // 用户消息会先落库再调用 AI，这里提前校验，避免超长消息写坏 chat_history 的 user 行
+        ThrowUtils.throwIf(message.length() > AppConstant.MAX_USER_MESSAGE_LENGTH,
+                ErrorCode.PARAMS_ERROR,
+                "输入内容过长，不要超过 " + AppConstant.MAX_USER_MESSAGE_LENGTH + " 字");
         //2.查询应用信息
         App app = this.getById(appId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
@@ -189,8 +194,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         if(codeGenTypeEnum == null){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR,"不支持的代码生成类型");
         }
-        //5.在调用 AI 前，先保存用户消息到数据库中
-        chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
+        //5.生成本轮轮次ID，并保存用户消息到数据库中
+        // 一轮 = 一次用户消息 + 对应的一次 AI 回复；user 行、ai 行和工具事件共用这个 turnId
+        long turnId = IdUtil.getSnowflakeNextId();
+        // 用户行只负责记录输入，success 固定为 null；成功与否由本轮 ai 行标记
+        chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(),
+                loginUser.getId(), turnId, null);
         //6.设置监控上下文（用户ID和应用ID）
         MonitorContextHolder.setContext(
                 MonitorContext.builder()
@@ -200,8 +209,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         );
         //7.调用AI生成代码（流式）
         Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
-        //8.收集AI响应内容，在完成后记录到对话历史
-        return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser,codeGenTypeEnum)
+        //8.收集AI响应内容，在流结束后记录到对话历史
+        // turnId 传进流处理器，ai 行会写入同一个 turnId，并根据完成/异常/取消写 success
+        return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser,
+                        codeGenTypeEnum, turnId)
                 .doFinally(signalType -> {
                     //流结束时 清理（无论成功、失败、取消）
                     MonitorContextHolder.clearContext();

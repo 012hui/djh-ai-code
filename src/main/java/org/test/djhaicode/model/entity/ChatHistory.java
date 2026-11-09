@@ -48,6 +48,17 @@ public class ChatHistory implements Serializable {
     private String messageType;
 
     /**
+     * 轮次ID：同一轮用户消息和AI消息共享
+     */
+    @Column("turnId")
+    private Long turnId;
+
+    /**
+     * 本轮是否成功完成：1成功 0失败；user行为null
+     */
+    private Integer success;
+
+    /**
      * 应用id
      */
     @Column("appId")

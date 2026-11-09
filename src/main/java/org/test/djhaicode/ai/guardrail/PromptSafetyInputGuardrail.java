@@ -3,6 +3,7 @@ package org.test.djhaicode.ai.guardrail;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.guardrail.InputGuardrail;
 import dev.langchain4j.guardrail.InputGuardrailResult;
+import org.test.djhaicode.constant.AppConstant;
 
 import java.util.Arrays;
 import java.util.List;
@@ -32,8 +33,9 @@ public class PromptSafetyInputGuardrail implements InputGuardrail {
     public InputGuardrailResult validate(UserMessage userMessage) {
         String input = userMessage.singleText();
         // 检查输入长度
-        if (input.length() > 1000) {
-            return fatal("输入内容过长，不要超过 1000 字");
+        // 与保存用户消息时使用同一个上限，避免两处规则不一致
+        if (input.length() > AppConstant.MAX_USER_MESSAGE_LENGTH) {
+            return fatal("输入内容过长，不要超过 " + AppConstant.MAX_USER_MESSAGE_LENGTH + " 字");
         }
         // 检查是否为空
         if (input.trim().isEmpty()) {

@@ -42,11 +42,21 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
 
     @Override
     public boolean addChatMessage(Long appId, String message, String messageType, Long userId) {
+        // 兼容旧调用：不记录轮次和成功标记
+        return addChatMessage(appId, message, messageType, userId, null, null);
+    }
+
+    @Override
+    public boolean addChatMessage(Long appId, String message, String messageType, Long userId,
+                                  Long turnId, Integer success) {
         //基础校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "消息内容不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(messageType), ErrorCode.PARAMS_ERROR, "消息类型不能为空");
         ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR, "用户ID不能为空");
+        // success 只允许 1/0；user 行传 null
+        ThrowUtils.throwIf(success != null && success != 0 && success != 1,
+                ErrorCode.PARAMS_ERROR, "成功标记只能是0或1");
         // 验证消息类型是否有效
         ChatHistoryMessageTypeEnum messageTypeEnum = ChatHistoryMessageTypeEnum.getEnumByValue(messageType);
         ThrowUtils.throwIf(messageTypeEnum == null, ErrorCode.PARAMS_ERROR, "不支持的消息类型: " + messageType);
@@ -56,6 +66,8 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
                 .message(message)
                 .messageType(messageType)
                 .userId(userId)
+                .turnId(turnId)       // 同一轮的 user 行和 ai 行共用
+                .success(success)     // 仅 ai 行写 1/0，user 行为 null
                 .build();
         return this.save(chatHistory);
     }

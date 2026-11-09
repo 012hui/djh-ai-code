@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 public interface ChatHistoryService extends IService<ChatHistory> {
 
     /**
-     * 添加对话历史
+     * 添加对话历史（兼容旧调用，不记录轮次和成功标记）
      *
      * @param appId         应用ID
      * @param message       对话消息
@@ -27,6 +27,21 @@ public interface ChatHistoryService extends IService<ChatHistory> {
      * @return   消息是否添加到对话历史成功
      */
     boolean addChatMessage(Long appId, String message, String messageType, Long userId);
+
+    /**
+     * 添加对话历史，并记录所属轮次与成功标记。
+     * 同一轮的 user 行和 ai 行共用同一个 turnId；只有 ai 行写 success。
+     *
+     * @param appId       应用ID
+     * @param message     对话消息
+     * @param messageType 消息类型
+     * @param userId      用户ID
+     * @param turnId      轮次ID
+     * @param success     本轮是否成功：1成功 0失败；user行为null
+     * @return 是否添加成功
+     */
+    boolean addChatMessage(Long appId, String message, String messageType, Long userId,
+                           Long turnId, Integer success);
 
     /**
      * 根据 appID 删除对话历史
