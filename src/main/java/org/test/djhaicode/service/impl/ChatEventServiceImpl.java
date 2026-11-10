@@ -45,6 +45,16 @@ public class ChatEventServiceImpl extends ServiceImpl<ChatEventMapper, ChatEvent
     }
 
     @Override
+    public boolean deleteByAppId(Long appId) {
+        ThrowUtils.throwIf(appId == null || appId <= 0,
+                ErrorCode.PARAMS_ERROR, "应用ID不能为空");
+        // 与 chat_history 保持一致，使用逻辑删除，保留审计数据
+        QueryWrapper queryWrapper = QueryWrapper.create()
+                .eq(ChatEvent::getAppId, appId);
+        return this.remove(queryWrapper);
+    }
+
+    @Override
     public List<ChatEvent> listByTurnId(Long turnId) {
         ThrowUtils.throwIf(turnId == null || turnId <= 0,
                 ErrorCode.PARAMS_ERROR, "轮次ID不能为空");

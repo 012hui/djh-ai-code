@@ -23,19 +23,39 @@ public abstract class BaseTool {
     public abstract String getDisplayName();
 
     /**
-     * 生成工具请求时的返回值（显示给用户）
+     * 生成“工具请求”的展示文本，用于前端显示。
+     * 这是给人看的提示，不是工具真实返回值。
      *
-     * @return 工具请求显示内容
+     * @return 工具请求展示文本
      */
-    public String generateToolRequestResponse() {
+    public String generateRequestDisplayText() {
         return String.format("\n\n[选择工具] %s\n\n", getDisplayName());
     }
 
     /**
-     * 生成工具执行结果格式（保存到数据库）
+     * 生成“工具执行完成后”的展示文本，用于前端和 chat_history。
+     * 注意：这不是工具真实返回值；模型看到的是 ToolResult.modelContent。
+     * 例如：writeFile 返回完整代码块，modifyFile 返回 old/new，readFile 只返回路径。
      *
      * @param arguments 工具执行参数
-     * @return 格式化的工具执行结果
+     * @return 前端/历史展示文本
      */
-    public abstract String generateToolExecutedResult(JSONObject arguments);
+    public abstract String generateDisplayText(JSONObject arguments);
+
+    /**
+     * 截断过长文本，避免事件摘要反向膨胀。
+     *
+     * @param text      原始文本
+     * @param maxLength 最大保留字符数
+     * @return 截断后的文本
+     */
+    protected String abbreviate(String text, int maxLength) {
+        if (text == null) {
+            return "";
+        }
+        if (text.length() <= maxLength) {
+            return text;
+        }
+        return text.substring(0, maxLength) + "...";
+    }
 }

@@ -35,23 +35,33 @@ public class FileDeleteTool extends BaseTool{
                 path = projectRoot.resolve(relativeFilePath);
             }
             if (!Files.exists(path)) {
-                return "警告：文件不存在，无需删除 - " + relativeFilePath;
+                String warning = "警告：文件不存在，无需删除 - " + relativeFilePath;
+                String summary = String.format("deleteFile %s 无操作（文件不存在）", relativeFilePath);
+                return ToolResult.success(summary, warning).toEnvelopeText();
             }
             if (!Files.isRegularFile(path)) {
-                return "错误：指定路径不是文件，无法删除 - " + relativeFilePath;
+                String error = "错误：指定路径不是文件，无法删除 - " + relativeFilePath;
+                String summary = String.format("deleteFile %s 失败：%s",
+                        relativeFilePath, abbreviate(error, 200));
+                return ToolResult.failure(summary, error).toEnvelopeText();
             }
             // 安全检查：避免删除重要文件
             String fileName = path.getFileName().toString();
             if (isImportantFile(fileName)) {
-                return "错误：不允许删除重要文件 - " + fileName;
+                String error = "错误：不允许删除重要文件 - " + fileName;
+                String summary = String.format("deleteFile %s 失败：不允许删除重要文件", relativeFilePath);
+                return ToolResult.failure(summary, error).toEnvelopeText();
             }
             Files.delete(path);
             log.info("成功删除文件: {}", path.toAbsolutePath());
-            return "文件删除成功: " + relativeFilePath;
+            String summary = String.format("deleteFile %s 成功", relativeFilePath);
+            return ToolResult.success(summary, "文件删除成功: " + relativeFilePath).toEnvelopeText();
         } catch (IOException e) {
             String errorMessage = "删除文件失败: " + relativeFilePath + ", 错误: " + e.getMessage();
             log.error(errorMessage, e);
-            return errorMessage;
+            String summary = String.format("deleteFile %s 失败：%s",
+                    relativeFilePath, abbreviate(errorMessage, 200));
+            return ToolResult.failure(summary, errorMessage).toEnvelopeText();
         }
     }
 
@@ -84,8 +94,9 @@ public class FileDeleteTool extends BaseTool{
     }
 
     @Override
-    public String generateToolExecutedResult(JSONObject arguments) {
+    public String generateDisplayText(JSONObject arguments) {
         String relativeFilePath = arguments.getStr("relativeFilePath");
         return String.format("[工具调用] %s %s", getDisplayName(), relativeFilePath);
     }
+
 }

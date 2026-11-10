@@ -31,6 +31,8 @@ public class FileWriteTool extends BaseTool{
             String content,
             @ToolMemoryId Long appId//工具上下文传参
     ) {
+        // 只把行数写进摘要，完整内容不进入事件表
+        int lineCount = content == null ? 0 : content.split("\n", -1).length;
         try {
             Path path = Paths.get(relativeFilePath);
             if (!path.isAbsolute()) {
@@ -63,11 +65,15 @@ public class FileWriteTool extends BaseTool{
                     StandardOpenOption.TRUNCATE_EXISTING);
             log.info("成功写入文件: {}", path.toAbsolutePath());
             // 注意要返回相对路径，不能让 AI 把文件绝对路径返回给用户
-            return "文件写入成功: " + relativeFilePath;
+            // 先拼事件摘要，再交给 ToolResult
+            String summary = String.format("writeFile %s（%d 行）成功", relativeFilePath, lineCount);
+            return ToolResult.success(summary, "文件写入成功: " + relativeFilePath).toEnvelopeText();
         } catch (IOException e) {
             String errorMessage = "文件写入失败: " + relativeFilePath + ", 错误: " + e.getMessage();
             log.error(errorMessage, e);
-            return errorMessage;
+            String summary = String.format("writeFile %s 失败：%s",
+                    relativeFilePath, abbreviate(errorMessage, 200));
+            return ToolResult.failure(summary, errorMessage).toEnvelopeText();
         }
     }
 
@@ -82,7 +88,7 @@ public class FileWriteTool extends BaseTool{
     }
 
     @Override
-    public String generateToolExecutedResult(JSONObject arguments) {
+    public String generateDisplayText(JSONObject arguments) {
         String relativeFilePath = arguments.getStr("relativeFilePath");
         String suffix = FileUtil.getSuffix(relativeFilePath);
         String content = arguments.getStr("content");
@@ -93,5 +99,6 @@ public class FileWriteTool extends BaseTool{
                         ```
                         """, getDisplayName(), relativeFilePath, suffix, content);
     }
+
 }
 

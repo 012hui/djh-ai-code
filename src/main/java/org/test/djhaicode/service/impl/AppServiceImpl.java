@@ -32,6 +32,7 @@ import org.test.djhaicode.monitor.MonitorContext;
 import org.test.djhaicode.monitor.MonitorContextHolder;
 import org.test.djhaicode.service.AppService;
 import org.springframework.stereotype.Service;
+import org.test.djhaicode.service.ChatEventService;
 import org.test.djhaicode.service.ChatHistoryService;
 import org.test.djhaicode.service.ScreenshotService;
 import org.test.djhaicode.service.UserService;
@@ -56,6 +57,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
     private UserService userService;
     @Resource
     private ChatHistoryService chatHistoryService;
+    // 工具事件服务，应用删除时同步逻辑删除
+    @Resource
+    private ChatEventService chatEventService;
     @Resource
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
     @Resource
@@ -305,6 +309,13 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         } catch (Exception e) {
             //记录日志但不阻止应用删除
             log.error("删除应用关联对话历史失败: {}", e.getMessage());
+        }
+        //同步逻辑删除工具事件，避免应用删除后留下孤儿数据
+        try {
+            chatEventService.deleteByAppId(appId);
+        } catch (Exception e) {
+            //记录日志但不阻止应用删除
+            log.error("删除应用关联工具事件失败: {}", e.getMessage());
         }
         //删除应用
         return super.removeById(id);

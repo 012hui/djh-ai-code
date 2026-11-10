@@ -22,6 +22,14 @@ public interface ChatEventService extends IService<ChatEvent> {
     boolean appendEvent(ChatEvent event);
 
     /**
+     * 根据 appId 逻辑删除工具事件，随应用删除一起清理
+     *
+     * @param appId 应用ID
+     * @return 是否成功
+     */
+    boolean deleteByAppId(Long appId);
+
+    /**
      * 按轮次查询工具事件，按 seq 升序
      *
      * @param turnId 轮次ID
